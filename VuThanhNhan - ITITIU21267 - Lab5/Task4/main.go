@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
@@ -12,11 +15,11 @@ import (
 
 type Book struct {
 	ID            int     `json:"id"`
-	Title         string  `json:"title" binding:"required"`
+	Title         string  `json:"title" binding:"required,min=3"`
 	Author        string  `json:"author"`
 	AuthorID      *int    `json:"author_id"`
-	ISBN          string  `json:"isbn"`
-	Price         float64 `json:"price" binding:"required,gt=0"`
+	ISBN          string  `json:"isbn" binding:"required"`
+	Price         float64 `json:"price" binding:"required,min=0.01,max=1000"`
 	Stock         int     `json:"stock" binding:"gte=0"`
 	PublishedYear int     `json:"published_year"`
 	Description   string  `json:"description"`
@@ -43,6 +46,20 @@ type BookWithAuthor struct {
 	PublishedYear int     `json:"published_year"`
 	Description   string  `json:"description"`
 	CreatedAt     string  `json:"created_at"`
+}
+
+type PaginationMeta struct {
+	Page       int  `json:"page"`
+	Limit      int  `json:"limit"`
+	Total      int  `json:"total"`
+	TotalPages int  `json:"total_pages"`
+	HasNext    bool `json:"has_next"`
+	HasPrev    bool `json:"has_prev"`
+}
+
+type PaginatedBooksResponse struct {
+	Books      []BookWithAuthor `json:"books"`
+	Pagination PaginationMeta   `json:"pagination"`
 }
 
 var db *sql.DB
@@ -152,6 +169,49 @@ func seedData() {
 			log.Println("Failed to seed book:", b.Title, err)
 		}
 	}
+}
+
+// Validation functions
+func validateISBN(isbn string) error {
+	// Remove hyphens
+	isbn = regexp.MustCompile(`-`).ReplaceAllString(isbn, "")
+
+	// Check if it's 10 or 13 digits
+	if len(isbn) != 10 && len(isbn) != 13 {
+		return fmt.Errorf("ISBN must be 10 or 13 digits")
+	}
+
+	// Check if all characters are digits
+	if !regexp.MustCompile(`^\d+$`).MatchString(isbn) {
+		return fmt.Errorf("ISBN must contain only digits")
+	}
+
+	return nil
+}
+
+func validatePublishedYear(year int) error {
+	currentYear := time.Now().Year()
+
+	if year < 1800 || year > currentYear {
+		return fmt.Errorf("published year must be between 1800 and %d", currentYear)
+	}
+
+	return nil
+}
+
+// Helper function to parse integer query parameters
+func parseIntQuery(c *gin.Context, key string, defaultValue int) int {
+	valueStr := c.Query(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+
+	return value
 }
 
 // Author Endpoints
@@ -337,16 +397,43 @@ func getAuthorBooks(c *gin.Context) {
 
 // Modified Book Endpoints
 
-// GET /books - with author information
+// GET /books - with pagination and author information
 func getBooks(c *gin.Context) {
+	// Parse pagination parameters
+	page := parseIntQuery(c, "page", 1)
+	limit := parseIntQuery(c, "limit", 20)
+
+	// Validate parameters
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	// Calculate offset
+	offset := (page - 1) * limit
+
+	// Get total count
+	var total int
+	err := db.QueryRow("SELECT COUNT(*) FROM books").Scan(&total)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to count books",
+		})
+		return
+	}
+
+	// Query books with LIMIT and OFFSET
 	query := `
-	SELECT b.id, b.title, b.author_id, a.name as author_name, 
+	SELECT b.id, b.title, b.author_id, a.name as author_name,
 	       b.isbn, b.price, b.stock, b.published_year, b.description, b.created_at
 	FROM books b
 	LEFT JOIN authors a ON b.author_id = a.id
-	ORDER BY b.id`
+	ORDER BY b.id
+	LIMIT ? OFFSET ?`
 
-	rows, err := db.Query(query)
+	rows, err := db.Query(query, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -368,9 +455,22 @@ func getBooks(c *gin.Context) {
 		books = append(books, b)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"books": books,
-		"count": len(books),
+	// Calculate pagination metadata
+	totalPages := (total + limit - 1) / limit
+
+	pagination := PaginationMeta{
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	}
+
+	// Return response with pagination
+	c.JSON(http.StatusOK, PaginatedBooksResponse{
+		Books:      books,
+		Pagination: pagination,
 	})
 }
 
@@ -401,24 +501,50 @@ func getBook(c *gin.Context) {
 	c.JSON(http.StatusOK, b)
 }
 
-// POST /books - with author_id support
+// POST /books - with enhanced validation
 func createBook(c *gin.Context) {
 	var b Book
+	
+	// Bind JSON with standard validation
 	if err := c.ShouldBindJSON(&b); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Validation failed",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Custom validations
+	if err := validateISBN(b.ISBN); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid ISBN",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	if err := validatePublishedYear(b.PublishedYear); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid published year",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	// Validate author_id if provided
 	if b.AuthorID != nil {
-		var exists int
-		err := db.QueryRow("SELECT COUNT(*) FROM authors WHERE id = ?", *b.AuthorID).Scan(&exists)
-		if err != nil || exists == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid author_id"})
+		var authorExists bool
+		err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM authors WHERE id = ?)", *b.AuthorID).Scan(&authorExists)
+		if err != nil || !authorExists {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Author not found",
+				"details": fmt.Sprintf("Author with ID %d does not exist", *b.AuthorID),
+			})
 			return
 		}
 	}
 
+	// Insert book into database
 	result, err := db.Exec(`INSERT INTO books 
 	(title, author_id, isbn, price, stock, published_year, description) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		b.Title, b.AuthorID, b.ISBN, b.Price, b.Stock, b.PublishedYear, b.Description)
@@ -441,21 +567,46 @@ func createBook(c *gin.Context) {
 	c.JSON(http.StatusCreated, b)
 }
 
-// PUT /books/:id
+// PUT /books/:id - with enhanced validation
 func updateBook(c *gin.Context) {
 	id := c.Param("id")
 	var b Book
+	
+	// Bind JSON with standard validation
 	if err := c.ShouldBindJSON(&b); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Validation failed",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Custom validations
+	if err := validateISBN(b.ISBN); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid ISBN",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	if err := validatePublishedYear(b.PublishedYear); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid published year",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	// Validate author_id if provided
 	if b.AuthorID != nil {
-		var exists int
-		err := db.QueryRow("SELECT COUNT(*) FROM authors WHERE id = ?", *b.AuthorID).Scan(&exists)
-		if err != nil || exists == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid author_id"})
+		var authorExists bool
+		err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM authors WHERE id = ?)", *b.AuthorID).Scan(&authorExists)
+		if err != nil || !authorExists {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Author not found",
+				"details": fmt.Sprintf("Author with ID %d does not exist", *b.AuthorID),
+			})
 			return
 		}
 	}
@@ -519,12 +670,12 @@ func main() {
 	router.DELETE("/authors/:id", deleteAuthor)
 	router.GET("/authors/:id/books", getAuthorBooks)
 
-	// Book routes
+	// Book routes (with pagination and enhanced validation)
 	router.GET("/books", getBooks)
 	router.GET("/books/:id", getBook)
 	router.POST("/books", createBook)
 	router.PUT("/books/:id", updateBook)
 	router.DELETE("/books/:id", deleteBook)
-	
+
 	router.Run(":8080")
 }
