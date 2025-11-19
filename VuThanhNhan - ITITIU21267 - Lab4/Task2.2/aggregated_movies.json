@@ -1,0 +1,77 @@
+[
+  {
+    "id": "tmdb-569094",
+    "title": "Spider-Man: Across the Spider-Verse",
+    "year": 2023,
+    "description": "After reuniting with Gwen Stacy, Brooklyn’s full-time, friendly neighborhood Spider-Man is catapulted across the Multiverse, where he encounters the Spider Society, a team of Spider-People charged with protecting the Multiverse’s very existence. But when the heroes clash on how to handle a new threat, Miles finds himself pitted against the other Spiders and must set out on his own to save those he loves most.",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Animation",
+      "Science Fiction"
+    ],
+    "rating": 8.396,
+    "source": "TMDB",
+    "last_updated": "2025-11-06T23:14:35+07:00"
+  },
+  {
+    "id": "scraper-1",
+    "title": "Spider-Man: The Beginning",
+    "director": "John Director",
+    "year": 2019,
+    "description": "An epic tale about spider-man that captivated audiences worldwide.",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Drama",
+      "Fantasy",
+      "Horror",
+      "Mystery",
+      "Science Fiction"
+    ],
+    "rating": 8.2,
+    "duration_minutes": 132,
+    "source": "MovieScraper",
+    "last_updated": "2025-11-06T23:14:34+07:00"
+  },
+  {
+    "id": "tmdb-634649",
+    "title": "Spider-Man: No Way Home",
+    "year": 2021,
+    "description": "Peter Parker is unmasked and no longer able to separate his normal life from the high-stakes of being a super-hero. When he asks for help from Doctor Strange the stakes become even more dangerous, forcing him to discover what it truly means to be Spider-Man.",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Science Fiction"
+    ],
+    "rating": 7.937,
+    "source": "TMDB",
+    "last_updated": "2025-11-06T23:14:35+07:00"
+  },
+  {
+    "id": "tmdb-315635",
+    "title": "Spider-Man: Homecoming",
+    "year": 2017,
+    "description": "Following the events of Captain America: Civil War, Peter Parker, with the help of his mentor Tony Stark, tries to balance his life as an ordinary high school student in Queens, New York City, with fighting crime as his superhero alter ego Spider-Man as a new threat, the Vulture, emerges.",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Science Fiction"
+    ],
+    "rating": 7.3,
+    "source": "TMDB",
+    "last_updated": "2025-11-06T23:14:35+07:00"
+  },
+  {
+    "id": "tmdb-148918",
+    "title": "Superman, Spider-Man or Batman",
+    "year": 2011,
+    "description": "Aron, a 5-year-old boy, sets together with his worried father on a journey at the end of which he wishes, like the superheroes in the comic books, to save his mother suffering from a heart condition.",
+    "genres": [
+      "Drama"
+    ],
+    "rating": 6.9,
+    "source": "TMDB",
+    "last_updated": "2025-11-06T23:14:35+07:00"
+  }
+]
