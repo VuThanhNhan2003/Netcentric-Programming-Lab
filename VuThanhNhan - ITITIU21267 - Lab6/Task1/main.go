@@ -25,15 +25,7 @@ func main() {
 	
 	// Create DetailedBook with category and tags
 	detailedBook := &pb.DetailedBook{
-		Book: &pb.Book{
-			Id:           1,
-			Title:        "The Go Programming Language",
-			Author:       "Alan Donovan",
-			Isbn:         "978-0134190440",
-			Price:        39.99,
-			Stock:        15,
-			PublishedYear: 2015,
-		},
+		Book:       book,
 		Category:   pb.BookCategory_NONFICTION,
 		Description: "A comprehensive introduction to Go programming.",
 		Tags:       []string{"programming", "go", "technical"},
