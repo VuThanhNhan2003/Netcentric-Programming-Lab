@@ -1,1 +1,11 @@
 *.docx
+*.sqlite3
+*.log
+.vscode/
+node_modules/
+dist/
+.env
+.DS_Store
+.idea/
+*.pdf
+.db

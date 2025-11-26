@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package bookservice;
+
+option go_package = "./proto";
+
+message Book {
+  int32 id = 1;
+  string title = 2;
+  string author = 3;
+  string isbn = 4;
+  float price = 5;
+  int32 stock = 6;
+  int32 published_year = 7;
+}
+
+// --- GetBook ---
+message GetBookRequest {
+  int32 id = 1;
+}
+message GetBookResponse {
+  Book book = 1;
+}
+
+// --- CreateBook ---
+message CreateBookRequest {
+  string title = 1;
+  string author = 2;
+  string isbn = 3;
+  float price = 4;
+  int32 stock = 5;
+  int32 published_year = 6;
+}
+message CreateBookResponse {
+  Book book = 1;
+}
+
+// --- UpdateBook ---
+message UpdateBookRequest {
+  int32 id = 1;
+  string title = 2;
+  string author = 3;
+  string isbn = 4;
+  float price = 5;
+  int32 stock = 6;
+  int32 published_year = 7;
+}
+message UpdateBookResponse {
+  Book book = 1;
+}
+
+// --- DeleteBook ---
+message DeleteBookRequest {
+  int32 id = 1;
+}
+message DeleteBookResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// --- ListBooks with pagination ---
+message ListBooksRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+message ListBooksResponse {
+  repeated Book books = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+service BookCatalog {
+  rpc GetBook(GetBookRequest) returns (GetBookResponse);
+  rpc CreateBook(CreateBookRequest) returns (CreateBookResponse);
+  rpc UpdateBook(UpdateBookRequest) returns (UpdateBookResponse);
+  rpc DeleteBook(DeleteBookRequest) returns (DeleteBookResponse);
+  rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
+}

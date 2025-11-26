@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package calculator;
+
+option go_package = "./proto";
+
+message CalculateRequest {
+  float a = 1;
+  float b = 2;
+  string operation = 3;  // "add", "subtract", "multiply", "divide"
+}
+
+message CalculateResponse {
+  float result = 1;
+  string operation = 2;
+}
+
+message SquareRootRequest {
+  float number = 1;
+}
+
+message SquareRootResponse {
+  float result = 1;
+}
+
+message HistoryRequest {}
+
+message HistoryResponse {
+  repeated string calculations = 1;
+  int32 count = 2;
+}
+
+service Calculator {
+  rpc Calculate(CalculateRequest) returns (CalculateResponse);
+  rpc SquareRoot(SquareRootRequest) returns (SquareRootResponse);
+  rpc GetHistory(HistoryRequest) returns (HistoryResponse);
+}
