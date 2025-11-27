@@ -74,6 +74,7 @@ func seedData() {
 // ------------------ CRUD ------------------
 
 // GET /books with optional filters and sorting
+// Example: /books?min_price=20&max_price=50&author=Martin&year=2008&sort=price_desc
 func getBooks(c *gin.Context) {
 	sortBy := c.DefaultQuery("sort", "id")
 	validSorts := map[string]string{
@@ -88,7 +89,7 @@ func getBooks(c *gin.Context) {
 	if !ok {
 		orderBy = "id ASC"
 	}
-
+	//  where 1=1 to simplify appending conditions
 	query := "SELECT id, title, author, isbn, price, stock, published_year, description, created_at FROM books WHERE 1=1"
 	var args []interface{}
 

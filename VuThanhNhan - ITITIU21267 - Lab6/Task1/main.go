@@ -36,7 +36,7 @@ func main() {
 	fmt.Printf("Category: %s\n", detailedBook.Category)
 	fmt.Printf("Tags: %v\n", detailedBook.Tags)
 	
-	// Serialize to bytes
+	// Serialize from Book to bytes
 	data, err := proto.Marshal(book)
 	if err != nil {
 		log.Fatal(err)
@@ -44,7 +44,7 @@ func main() {
 	
 	fmt.Printf("\nSerialized size: %d bytes\n", len(data))
 	
-	// Deserialize from bytes
+	// Deserialize from bytes to Book
 	newBook := &pb.Book{}
 	err = proto.Unmarshal(data, newBook)
 	if err != nil {

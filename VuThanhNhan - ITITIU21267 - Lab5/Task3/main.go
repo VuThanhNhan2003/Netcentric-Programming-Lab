@@ -92,7 +92,7 @@ func initDB() error {
 
 func seedAuthors() {
 	var count int
-	db.QueryRow("SELECT COUNT(*) FROM authors").Scan(&count)
+	db.QueryRow("SELECT COUNT(*) FROM authors").Scan(&count) // check table empty?
 	if count > 0 {
 		return
 	}

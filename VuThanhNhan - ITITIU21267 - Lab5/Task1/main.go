@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	// "time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
@@ -24,14 +23,14 @@ type Book struct {
 }
 
 var db *sql.DB
-
+// Init database and create books table if not exists
 func initDB() error {
 	var err error
 	db, err = sql.Open("sqlite3", "./bookstore.db")
 	if err != nil {
 		return err
 	}
-
+// Create books table
 	createTableSQL := `
 	CREATE TABLE IF NOT EXISTS books (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,10 +46,10 @@ func initDB() error {
 	_, err = db.Exec(createTableSQL)
 	return err
 }
-
+// Seed database with sample data if empty
 func seedData() {
 	var count int
-	db.QueryRow("SELECT COUNT(*) FROM books").Scan(&count)
+	db.QueryRow("SELECT COUNT(*) FROM books").Scan(&count) // check table empty?
 	if count > 0 {
 		return
 	}
@@ -62,7 +61,7 @@ func seedData() {
 		{Title: "The Pragmatic Programmer", Author: "Andrew Hunt", ISBN: "978-0201616224", Price: 35.99, Stock: 12, PublishedYear: 1999, Description: "From Journeyman to Master"},
 		{Title: "Code Complete", Author: "Steve McConnell", ISBN: "978-0735619678", Price: 38.99, Stock: 8, PublishedYear: 2004, Description: "A Practical Handbook of Software Construction"},
 	}
-
+	// Insert sample books
 	for _, b := range sampleBooks {
 		_, err := db.Exec(`INSERT INTO books 
 		(title, author, isbn, price, stock, published_year, description) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -74,23 +73,24 @@ func seedData() {
 }
 
 // GET /books
-func getBooks(c *gin.Context) {
+func getBooks(c *gin.Context) { // get all books
 	rows, err := db.Query("SELECT id, title, author, isbn, price, stock, published_year, description, created_at FROM books")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	defer rows.Close()
+	defer rows.Close() // close rows after function ends
 
 	books := []Book{}
-	for rows.Next() {
+	for rows.Next() { 
 		var b Book
+		// Scan row into Book struct
 		err := rows.Scan(&b.ID, &b.Title, &b.Author, &b.ISBN, &b.Price, &b.Stock, &b.PublishedYear, &b.Description, &b.CreatedAt)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		books = append(books, b)
+		books = append(books, b) // add book to slice
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -103,6 +103,7 @@ func getBooks(c *gin.Context) {
 func getBook(c *gin.Context) {
 	id := c.Param("id")
 	var b Book
+	// Query book by ID and scan into Book struct 
 	err := db.QueryRow(`SELECT id, title, author, isbn, price, stock, published_year, description, created_at 
 	FROM books WHERE id = ?`, id).Scan(
 		&b.ID, &b.Title, &b.Author, &b.ISBN, &b.Price, &b.Stock, &b.PublishedYear, &b.Description, &b.CreatedAt,
@@ -121,7 +122,7 @@ func getBook(c *gin.Context) {
 // POST /books
 func createBook(c *gin.Context) {
 	var b Book
-	if err := c.ShouldBindJSON(&b); err != nil {
+	if err := c.ShouldBindJSON(&b); err != nil { // bind JSON to Book struct
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
 		return
 	}
@@ -133,7 +134,7 @@ func createBook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	// Get the last inserted ID
 	id, err := result.LastInsertId()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -163,14 +164,14 @@ func updateBook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	// If no rows affected, book not found
 	rowsAffected, _ := res.RowsAffected()
 	if rowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
 		return
 	}
 
-	b.ID = atoi(id)
+	b.ID = atoi(id) // convert id to int
 	c.JSON(http.StatusOK, b)
 }
 
@@ -190,7 +191,7 @@ func deleteBook(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Book deleted successfully"})
 }
 
-// helper
+// helper to convert string to int
 func atoi(s string) int {
 	var i int
 	fmt.Sscan(s, &i)
@@ -205,7 +206,7 @@ func main() {
 
 	seedData()
 
-	router := gin.Default()
+	router := gin.Default() // create Gin router
 	router.GET("/books", getBooks)
 	router.GET("/books/:id", getBook)
 	router.POST("/books", createBook)
