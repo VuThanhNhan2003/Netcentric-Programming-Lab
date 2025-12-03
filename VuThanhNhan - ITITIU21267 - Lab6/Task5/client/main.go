@@ -47,7 +47,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create author: %v", err)
 	}
-	
 	fmt.Printf("✓ Created author: %s (ID: %d)\n\n", 
 		authorResp.Author.Name, authorResp.Author.Id)
 	
@@ -55,7 +54,7 @@ func main() {
 	fmt.Println("2. Creating books for author...")
 	book1, err := bookClient.CreateBook(ctx, &bookpb.CreateBookRequest{
 		Title:         "Refactoring",
-		Author:        authorResp.Author.Name,
+		Author:        authorResp.Author.Name,  // Add author name
 		AuthorId:      authorResp.Author.Id,
 		Isbn:          "978-0134757599",
 		Price:         49.99,
@@ -65,14 +64,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create book 1: %v", err)
 	}
-	if book1 == nil || book1.Book == nil {
-		log.Fatal("Book 1 response is nil")
-	}
 	fmt.Printf("✓ Created book: %s\n", book1.Book.Title)
 	
 	book2, err := bookClient.CreateBook(ctx, &bookpb.CreateBookRequest{
 		Title:         "Patterns of Enterprise Application Architecture",
-		Author:        authorResp.Author.Name,
+		Author:        authorResp.Author.Name,  // Add author name
 		AuthorId:      authorResp.Author.Id,
 		Isbn:          "978-0321127426",
 		Price:         54.99,
@@ -81,9 +77,6 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("Failed to create book 2: %v", err)
-	}
-	if book2 == nil || book2.Book == nil {
-		log.Fatal("Book 2 response is nil")
 	}
 	fmt.Printf("✓ Created book: %s\n\n", book2.Book.Title)
 	
@@ -99,8 +92,7 @@ func main() {
 	fmt.Printf("✓ Author: %s\n", booksResp.Author.Name)
 	fmt.Printf("✓ Books written: %d\n", booksResp.BookCount)
 	for i, book := range booksResp.Books {
-		fmt.Printf("  %d. %s (%d) - $%.2f\n", 
-			i+1, book.Title, book.PublishedYear, book.Price)
+		fmt.Printf("  %d. %s (%d)\n", i+1, book.Title, book.PublishedYear)
 	}
 	
 	fmt.Println("\n✓ Microservice demo completed!")
