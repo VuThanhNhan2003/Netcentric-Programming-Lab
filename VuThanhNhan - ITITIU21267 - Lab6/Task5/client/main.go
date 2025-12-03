@@ -45,47 +45,62 @@ func main() {
 		Country:   "UK",
 	})
 	if err != nil {
-		log.Printf("Failed to create author: %v", err)
-	} else {
-		fmt.Printf("✓ Created author: %s (ID: %d)\n\n", 
-			authorResp.Author.Name, authorResp.Author.Id)
-		
-		// 2. Create books for this author
-		fmt.Println("2. Creating books for author...")
-		book1, _ := bookClient.CreateBook(ctx, &bookpb.CreateBookRequest{
-			Title:         "Refactoring",
-			AuthorId:      authorResp.Author.Id,
-			Isbn:          "978-0134757599",
-			Price:         49.99,
-			Stock:         15,
-			PublishedYear: 2018,
-		})
-		fmt.Printf("✓ Created book: %s\n", book1.Book.Title)
-		
-		book2, _ := bookClient.CreateBook(ctx, &bookpb.CreateBookRequest{
-			Title:         "Patterns of Enterprise Application Architecture",
-			AuthorId:      authorResp.Author.Id,
-			Isbn:          "978-0321127426",
-			Price:         54.99,
-			Stock:         8,
-			PublishedYear: 2002,
-		})
-		fmt.Printf("✓ Created book: %s\n\n", book2.Book.Title)
-		
-		// 3. Get author's books (cross-service call)
-		fmt.Println("3. Fetching author's books (cross-service call)...")
-		booksResp, err := authorClient.GetAuthorBooks(ctx, &authorpb.GetAuthorBooksRequest{
-			AuthorId: authorResp.Author.Id,
-		})
-		if err != nil {
-			log.Printf("Failed: %v", err)
-		} else {
-			fmt.Printf("✓ Author: %s\n", booksResp.Author.Name)
-			fmt.Printf("✓ Books written: %d\n", booksResp.BookCount)
-			for i, book := range booksResp.Books {
-				fmt.Printf("  %d. %s (%d)\n", i+1, book.Title, book.PublishedYear)
-			}
-		}
+		log.Fatalf("Failed to create author: %v", err)
+	}
+	
+	fmt.Printf("✓ Created author: %s (ID: %d)\n\n", 
+		authorResp.Author.Name, authorResp.Author.Id)
+	
+	// 2. Create books for this author
+	fmt.Println("2. Creating books for author...")
+	book1, err := bookClient.CreateBook(ctx, &bookpb.CreateBookRequest{
+		Title:         "Refactoring",
+		Author:        authorResp.Author.Name,
+		AuthorId:      authorResp.Author.Id,
+		Isbn:          "978-0134757599",
+		Price:         49.99,
+		Stock:         15,
+		PublishedYear: 2018,
+	})
+	if err != nil {
+		log.Fatalf("Failed to create book 1: %v", err)
+	}
+	if book1 == nil || book1.Book == nil {
+		log.Fatal("Book 1 response is nil")
+	}
+	fmt.Printf("✓ Created book: %s\n", book1.Book.Title)
+	
+	book2, err := bookClient.CreateBook(ctx, &bookpb.CreateBookRequest{
+		Title:         "Patterns of Enterprise Application Architecture",
+		Author:        authorResp.Author.Name,
+		AuthorId:      authorResp.Author.Id,
+		Isbn:          "978-0321127426",
+		Price:         54.99,
+		Stock:         8,
+		PublishedYear: 2002,
+	})
+	if err != nil {
+		log.Fatalf("Failed to create book 2: %v", err)
+	}
+	if book2 == nil || book2.Book == nil {
+		log.Fatal("Book 2 response is nil")
+	}
+	fmt.Printf("✓ Created book: %s\n\n", book2.Book.Title)
+	
+	// 3. Get author's books (cross-service call)
+	fmt.Println("3. Fetching author's books (cross-service call)...")
+	booksResp, err := authorClient.GetAuthorBooks(ctx, &authorpb.GetAuthorBooksRequest{
+		AuthorId: authorResp.Author.Id,
+	})
+	if err != nil {
+		log.Fatalf("Failed to get author books: %v", err)
+	}
+	
+	fmt.Printf("✓ Author: %s\n", booksResp.Author.Name)
+	fmt.Printf("✓ Books written: %d\n", booksResp.BookCount)
+	for i, book := range booksResp.Books {
+		fmt.Printf("  %d. %s (%d) - $%.2f\n", 
+			i+1, book.Title, book.PublishedYear, book.Price)
 	}
 	
 	fmt.Println("\n✓ Microservice demo completed!")
