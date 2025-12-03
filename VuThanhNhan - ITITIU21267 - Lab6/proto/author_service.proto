@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package authorservice;
+
+option go_package = "./proto";
+
+message Author {
+  int32 id = 1;
+  string name = 2;
+  string bio = 3;
+  int32 birth_year = 4;
+  string country = 5;
+}
+
+message GetAuthorRequest {
+  int32 id = 1;
+}
+
+message GetAuthorResponse {
+  Author author = 1;
+}
+
+message CreateAuthorRequest {
+  string name = 1;
+  string bio = 2;
+  int32 birth_year = 3;
+  string country = 4;
+}
+
+message CreateAuthorResponse {
+  Author author = 1;
+}
+
+message ListAuthorsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message ListAuthorsResponse {
+  repeated Author authors = 1;
+  int32 total = 2;
+}
+
+message GetAuthorBooksRequest {
+  int32 author_id = 1;
+}
+
+// Reference to Book from book_service
+message BookSummary {
+  int32 id = 1;
+  string title = 2;
+  float price = 3;
+  int32 published_year = 4;
+}
+
+message GetAuthorBooksResponse {
+  Author author = 1;
+  repeated BookSummary books = 2;
+  int32 book_count = 3;
+}
+
+service AuthorCatalog {
+  rpc GetAuthor(GetAuthorRequest) returns (GetAuthorResponse);
+  rpc CreateAuthor(CreateAuthorRequest) returns (CreateAuthorResponse);
+  rpc ListAuthors(ListAuthorsRequest) returns (ListAuthorsResponse);
+  rpc GetAuthorBooks(GetAuthorBooksRequest) returns (GetAuthorBooksResponse);
+}

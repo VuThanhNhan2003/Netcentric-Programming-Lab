@@ -4,6 +4,7 @@ package bookservice;
 
 option go_package = "./proto";
 
+// ======================= Book Model ===========================
 message Book {
   int32 id = 1;
   string title = 2;
@@ -12,9 +13,10 @@ message Book {
   float price = 5;
   int32 stock = 6;
   int32 published_year = 7;
+  int32 author_id = 8;
 }
 
-// --- GetBook ---
+// ======================= GetBook ==============================
 message GetBookRequest {
   int32 id = 1;
 }
@@ -22,7 +24,7 @@ message GetBookResponse {
   Book book = 1;
 }
 
-// --- CreateBook ---
+// ======================= CreateBook ===========================
 message CreateBookRequest {
   string title = 1;
   string author = 2;
@@ -30,12 +32,13 @@ message CreateBookRequest {
   float price = 4;
   int32 stock = 5;
   int32 published_year = 6;
+  int32 author_id = 7;
 }
 message CreateBookResponse {
   Book book = 1;
 }
 
-// --- UpdateBook ---
+// ======================= UpdateBook ===========================
 message UpdateBookRequest {
   int32 id = 1;
   string title = 2;
@@ -44,12 +47,13 @@ message UpdateBookRequest {
   float price = 5;
   int32 stock = 6;
   int32 published_year = 7;
+  int32 author_id = 8;
 }
 message UpdateBookResponse {
   Book book = 1;
 }
 
-// --- DeleteBook ---
+// ======================= DeleteBook ===========================
 message DeleteBookRequest {
   int32 id = 1;
 }
@@ -58,7 +62,7 @@ message DeleteBookResponse {
   string message = 2;
 }
 
-// --- ListBooks with pagination ---
+// ======================= ListBooks w/ Pagination ===============
 message ListBooksRequest {
   int32 page = 1;
   int32 page_size = 2;
@@ -70,10 +74,65 @@ message ListBooksResponse {
   int32 page_size = 4;
 }
 
+// ======================= Task 4: SearchBooks ===================
+message SearchBooksRequest {
+  string query = 1;
+  string field = 2;  // "title", "author", "isbn", "all"
+}
+
+message SearchBooksResponse {
+  repeated Book books = 1;
+  int32 count = 2;
+  string query = 3;
+}
+
+// ======================= Task 4: FilterBooks ===================
+message FilterBooksRequest {
+  float min_price = 1;
+  float max_price = 2;
+  int32 min_year = 3;
+  int32 max_year = 4;
+}
+
+message FilterBooksResponse {
+  repeated Book books = 1;
+  int32 count = 2;
+}
+
+// ======================= Task 4: GetStats ======================
+message GetStatsRequest {
+  // Empty
+}
+
+message GetStatsResponse {
+  int32 total_books = 1;
+  float average_price = 2;
+  int32 total_stock = 3;
+  int32 earliest_year = 4;
+  int32 latest_year = 5;
+}
+
+// --- NEW: GetBooksByAuthor ---
+message GetBooksByAuthorRequest {
+  int32 author_id = 1;
+}
+
+message GetBooksByAuthorResponse {
+  repeated Book books = 1;
+  int32 count = 2;
+}
+
+// ======================= Service ===============================
 service BookCatalog {
   rpc GetBook(GetBookRequest) returns (GetBookResponse);
   rpc CreateBook(CreateBookRequest) returns (CreateBookResponse);
   rpc UpdateBook(UpdateBookRequest) returns (UpdateBookResponse);
   rpc DeleteBook(DeleteBookRequest) returns (DeleteBookResponse);
   rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
+
+  rpc SearchBooks(SearchBooksRequest) returns (SearchBooksResponse);
+  rpc FilterBooks(FilterBooksRequest) returns (FilterBooksResponse);
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+
+  rpc GetBooksByAuthor(GetBooksByAuthorRequest) returns (GetBooksByAuthorResponse);
 }
