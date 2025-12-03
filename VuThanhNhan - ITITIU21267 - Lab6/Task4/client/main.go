@@ -9,6 +9,8 @@ import (
 	pb "book-catalog-grpc/proto/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
 )
 
 func main() {
@@ -23,66 +25,104 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// === Test 1 ===
 	fmt.Println("=== Test 1: Search by Title ===")
-	doSearch(ctx, client, "go", "title")
+	fmt.Println(`Searching for "go"...`)
+	searchAndCount(ctx, client, "go", "title")
 
+	// === Test 2 ===
 	fmt.Println("\n=== Test 2: Search by Author ===")
-	doSearch(ctx, client, "Robert", "author")
+	fmt.Println(`Searching for "Martin"...`)
+	searchAndCount(ctx, client, "Martin", "author")
 
-	fmt.Println("\n=== Test 3: Search by ISBN (exact) ===")
-	doSearch(ctx, client, "9780134190440", "isbn")
+	// === Test 3 ===
+	fmt.Println("\n=== Test 3: Filter by Price ===")
+	fmt.Println("Books between $20 and $45:")
+	filterAndCount(ctx, client, 20, 45, 0, 0)
 
-	fmt.Println("\n=== Test 4: Search all fields ===")
-	doSearch(ctx, client, "Learning", "all")
+	// === Test 4 ===
+	fmt.Println("\n=== Test 4: Filter by Year ===")
+	fmt.Println("Books published after 2010:")
+	filterAndCount(ctx, client, 0, 0, 2010, 0)
 
-	fmt.Println("\n=== Test 5: Empty search (expect error) ===")
-	doSearch(ctx, client, "", "title")
-
-	fmt.Println("\n=== Test 6: Filter by price (20 - 45) ===")
-	doFilter(ctx, client, 20.0, 45.0, 0, 0)
-
-	fmt.Println("\n=== Test 7: Filter by year (>=2010) ===")
-	doFilter(ctx, client, 0, 0, 2010, 0)
-
-	fmt.Println("\n=== Test 8: Invalid filter (min > max) expect error ===")
-	doFilter(ctx, client, 50.0, 20.0, 0, 0)
-
-	fmt.Println("\n=== Test 9: Get Stats ===")
+	// === Test 5 ===
+	fmt.Println("\n=== Test 5: Get Statistics ===")
 	doStats(ctx, client)
+
+	// === Test 6 ===
+	fmt.Println("\n=== Test 6: Error Cases ===")
+	fmt.Println("Empty search query:")
+	searchError(ctx, client, "", "title")
+
+	fmt.Println("Invalid price range:")
+	filterError(ctx, client, 50, 20, 0, 0)
 }
 
-func doSearch(ctx context.Context, client pb.BookCatalogClient, q string, field string) {
+func searchAndCount(ctx context.Context, client pb.BookCatalogClient, q, field string) {
 	resp, err := client.SearchBooks(ctx, &pb.SearchBooksRequest{Query: q, Field: field})
 	if err != nil {
-		fmt.Printf("Search error: %v\n", err)
+		printGrpcError(err)
 		return
 	}
-	fmt.Printf("Query=%q, Found=%d\n", resp.Query, resp.Count)
-	for i, b := range resp.Books {
-		fmt.Printf("%d. %s by %s (ISBN:%s) $%.2f, year=%d\n", i+1, b.Title, b.Author, b.Isbn, b.Price, b.PublishedYear)
+
+	fmt.Printf("Found %d books:\n", resp.Count)
+	for _, b := range resp.Books {
+		fmt.Printf("- %s\n", b.Title)
 	}
 }
 
-func doFilter(ctx context.Context, client pb.BookCatalogClient, minPrice, maxPrice float32, minYear, maxYear int32) {
+func searchError(ctx context.Context, client pb.BookCatalogClient, q, field string) {
+	_, err := client.SearchBooks(ctx, &pb.SearchBooksRequest{Query: q, Field: field})
+	printGrpcError(err)
+}
+
+func filterAndCount(ctx context.Context, client pb.BookCatalogClient,
+	minPrice, maxPrice float32, minYear, maxYear int32) {
+
 	resp, err := client.FilterBooks(ctx, &pb.FilterBooksRequest{
 		MinPrice: minPrice, MaxPrice: maxPrice, MinYear: minYear, MaxYear: maxYear,
 	})
+
 	if err != nil {
-		fmt.Printf("Filter error: %v\n", err)
+		printGrpcError(err)
 		return
 	}
-	fmt.Printf("Filter found %d books\n", resp.Count)
-	for i, b := range resp.Books {
-		fmt.Printf("%d. %s by %s - $%.2f (year %d)\n", i+1, b.Title, b.Author, b.Price, b.PublishedYear)
-	}
+
+	fmt.Printf("Found %d books\n", resp.Count)
+}
+
+func filterError(ctx context.Context, client pb.BookCatalogClient,
+	minPrice, maxPrice float32, minYear, maxYear int32) {
+
+	_, err := client.FilterBooks(ctx, &pb.FilterBooksRequest{
+		MinPrice: minPrice, MaxPrice: maxPrice, MinYear: minYear, MaxYear: maxYear,
+	})
+
+	printGrpcError(err)
 }
 
 func doStats(ctx context.Context, client pb.BookCatalogClient) {
 	resp, err := client.GetStats(ctx, &pb.GetStatsRequest{})
 	if err != nil {
-		fmt.Printf("Stats error: %v\n", err)
+		printGrpcError(err)
 		return
 	}
-	fmt.Printf("Total books: %d\nAverage price: %.2f\nTotal stock: %d\nYear range: %d - %d\n",
-		resp.TotalBooks, resp.AveragePrice, resp.TotalStock, resp.EarliestYear, resp.LatestYear)
+
+	fmt.Printf("Total books: %d\n", resp.TotalBooks)
+	fmt.Printf("Average price: $%.2f\n", resp.AveragePrice)
+	fmt.Printf("Total stock: %d\n", resp.TotalStock)
+	fmt.Printf("Year range: %d - %d\n", resp.EarliestYear, resp.LatestYear)
+}
+
+// Helper: clean gRPC error to match required output
+func printGrpcError(err error) {
+	if err == nil {
+		return
+	}
+	st, ok := status.FromError(err)
+	if ok {
+		fmt.Printf("Error: %s\n", st.Message())
+	} else {
+		fmt.Printf("Error: %v\n", err)
+	}
 }
