@@ -24,13 +24,13 @@ type bookCatalogServer struct {
 // ======================== GetBook ============================
 func (s *bookCatalogServer) GetBook(ctx context.Context, req *pb.GetBookRequest) (*pb.GetBookResponse, error) {
 	row := s.db.QueryRowContext(ctx,
-		"SELECT id, title, author, isbn, price, stock, published_year FROM books WHERE id = ?",
+		"SELECT id, title, author, isbn, price, stock, published_year, author_id FROM books WHERE id = ?",
 		req.Id,
 	)
 
 	var book pb.Book
 	err := row.Scan(&book.Id, &book.Title, &book.Author, &book.Isbn,
-		&book.Price, &book.Stock, &book.PublishedYear)
+		&book.Price, &book.Stock, &book.PublishedYear, &book.AuthorId)
 
 	if err == sql.ErrNoRows {
 		return nil, status.Errorf(codes.NotFound, "book not found: id=%d", req.Id)
@@ -44,6 +44,8 @@ func (s *bookCatalogServer) GetBook(ctx context.Context, req *pb.GetBookRequest)
 
 // ======================== GetBooksByAuthor ============================
 func (s *bookCatalogServer) GetBooksByAuthor(ctx context.Context, req *pb.GetBooksByAuthorRequest) (*pb.GetBooksByAuthorResponse, error) {
+	log.Printf("GetBooksByAuthor: author_id=%d", req.AuthorId)
+	
 	rows, err := s.db.QueryContext(ctx,
 		"SELECT id, title, author, isbn, price, stock, published_year, author_id FROM books WHERE author_id = ?",
 		req.AuthorId,
@@ -69,16 +71,17 @@ func (s *bookCatalogServer) GetBooksByAuthor(ctx context.Context, req *pb.GetBoo
 	}, nil
 }
 
-
 // ======================== CreateBook ============================
 func (s *bookCatalogServer) CreateBook(ctx context.Context, req *pb.CreateBookRequest) (*pb.CreateBookResponse, error) {
+	log.Printf("CreateBook: title=%s, author_id=%d", req.Title, req.AuthorId)
+	
 	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Author) == "" {
 		return nil, status.Error(codes.InvalidArgument, "title and author are required")
 	}
 
 	res, err := s.db.ExecContext(ctx,
-		"INSERT INTO books (title, author, isbn, price, stock, published_year) VALUES (?, ?, ?, ?, ?, ?)",
-		req.Title, req.Author, req.Isbn, req.Price, req.Stock, req.PublishedYear)
+		"INSERT INTO books (title, author, isbn, price, stock, published_year, author_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		req.Title, req.Author, req.Isbn, req.Price, req.Stock, req.PublishedYear, req.AuthorId)
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create book: %v", err)
@@ -95,6 +98,7 @@ func (s *bookCatalogServer) CreateBook(ctx context.Context, req *pb.CreateBookRe
 			Price:         req.Price,
 			Stock:         req.Stock,
 			PublishedYear: req.PublishedYear,
+			AuthorId:      req.AuthorId,
 		},
 	}, nil
 }
@@ -102,8 +106,8 @@ func (s *bookCatalogServer) CreateBook(ctx context.Context, req *pb.CreateBookRe
 // ======================== UpdateBook ============================
 func (s *bookCatalogServer) UpdateBook(ctx context.Context, req *pb.UpdateBookRequest) (*pb.UpdateBookResponse, error) {
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE books SET title=?, author=?, isbn=?, price=?, stock=?, published_year=? WHERE id=?`,
-		req.Title, req.Author, req.Isbn, req.Price, req.Stock, req.PublishedYear, req.Id)
+		`UPDATE books SET title=?, author=?, isbn=?, price=?, stock=?, published_year=?, author_id=? WHERE id=?`,
+		req.Title, req.Author, req.Isbn, req.Price, req.Stock, req.PublishedYear, req.AuthorId, req.Id)
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update book: %v", err)
@@ -123,6 +127,7 @@ func (s *bookCatalogServer) UpdateBook(ctx context.Context, req *pb.UpdateBookRe
 			Price:         req.Price,
 			Stock:         req.Stock,
 			PublishedYear: req.PublishedYear,
+			AuthorId:      req.AuthorId,
 		},
 	}, nil
 }
@@ -167,7 +172,7 @@ func (s *bookCatalogServer) ListBooks(ctx context.Context, req *pb.ListBooksRequ
 
 	// Query with pagination
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, title, author, isbn, price, stock, published_year FROM books LIMIT ? OFFSET ?",
+		"SELECT id, title, author, isbn, price, stock, published_year, COALESCE(author_id, 0) FROM books LIMIT ? OFFSET ?",
 		req.PageSize, offset)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "query failed: %v", err)
@@ -177,7 +182,7 @@ func (s *bookCatalogServer) ListBooks(ctx context.Context, req *pb.ListBooksRequ
 	books := []*pb.Book{}
 	for rows.Next() {
 		var b pb.Book
-		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Isbn, &b.Price, &b.Stock, &b.PublishedYear); err != nil {
+		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Isbn, &b.Price, &b.Stock, &b.PublishedYear, &b.AuthorId); err != nil {
 			return nil, status.Errorf(codes.Internal, "scan failed: %v", err)
 		}
 		books = append(books, &b)
@@ -200,7 +205,6 @@ func (s *bookCatalogServer) SearchBooks(ctx context.Context, req *pb.SearchBooks
 
 	logf("query=%q, field=%q", req.Query, req.Field)
 
-	// Validation
 	if strings.TrimSpace(req.Query) == "" {
 		return nil, status.Error(codes.InvalidArgument, "search query required")
 	}
@@ -213,17 +217,16 @@ func (s *bookCatalogServer) SearchBooks(ctx context.Context, req *pb.SearchBooks
 
 	switch field {
 	case "title":
-		sqlQuery = "SELECT id, title, author, isbn, price, stock, published_year FROM books WHERE title LIKE ?"
+		sqlQuery = "SELECT id, title, author, isbn, price, stock, published_year, COALESCE(author_id, 0) FROM books WHERE title LIKE ?"
 		args = []interface{}{searchPattern}
 	case "author":
-		sqlQuery = "SELECT id, title, author, isbn, price, stock, published_year FROM books WHERE author LIKE ?"
+		sqlQuery = "SELECT id, title, author, isbn, price, stock, published_year, COALESCE(author_id, 0) FROM books WHERE author LIKE ?"
 		args = []interface{}{searchPattern}
 	case "isbn":
-		// ISBN: use exact match or partial? requirement says exact match -> use '='
-		sqlQuery = "SELECT id, title, author, isbn, price, stock, published_year FROM books WHERE isbn = ?"
+		sqlQuery = "SELECT id, title, author, isbn, price, stock, published_year, COALESCE(author_id, 0) FROM books WHERE isbn = ?"
 		args = []interface{}{req.Query}
 	case "all", "":
-		sqlQuery = `SELECT id, title, author, isbn, price, stock, published_year 
+		sqlQuery = `SELECT id, title, author, isbn, price, stock, published_year, COALESCE(author_id, 0)
 		            FROM books 
 		            WHERE title LIKE ? OR author LIKE ? OR isbn LIKE ?`
 		args = []interface{}{searchPattern, searchPattern, searchPattern}
@@ -240,7 +243,7 @@ func (s *bookCatalogServer) SearchBooks(ctx context.Context, req *pb.SearchBooks
 	books := []*pb.Book{}
 	for rows.Next() {
 		var b pb.Book
-		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Isbn, &b.Price, &b.Stock, &b.PublishedYear); err != nil {
+		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Isbn, &b.Price, &b.Stock, &b.PublishedYear, &b.AuthorId); err != nil {
 			return nil, status.Errorf(codes.Internal, "scan failed: %v", err)
 		}
 		books = append(books, &b)
@@ -257,11 +260,9 @@ func (s *bookCatalogServer) SearchBooks(ctx context.Context, req *pb.SearchBooks
 func (s *bookCatalogServer) FilterBooks(ctx context.Context, req *pb.FilterBooksRequest) (*pb.FilterBooksResponse, error) {
 	log.Printf("FilterBooks: price[%.2f-%.2f], year[%d-%d]", req.MinPrice, req.MaxPrice, req.MinYear, req.MaxYear)
 
-	// Validate
 	if req.MinPrice < 0 || req.MaxPrice < 0 {
 		return nil, status.Error(codes.InvalidArgument, "price cannot be negative")
 	}
-	// If both provided and min > max -> invalid
 	if req.MaxPrice > 0 && req.MinPrice > req.MaxPrice {
 		return nil, status.Error(codes.InvalidArgument, "min_price cannot be greater than max_price")
 	}
@@ -269,7 +270,7 @@ func (s *bookCatalogServer) FilterBooks(ctx context.Context, req *pb.FilterBooks
 		return nil, status.Error(codes.InvalidArgument, "min_year cannot be greater than max_year")
 	}
 
-	query := "SELECT id, title, author, isbn, price, stock, published_year FROM books WHERE 1=1"
+	query := "SELECT id, title, author, isbn, price, stock, published_year, COALESCE(author_id, 0) FROM books WHERE 1=1"
 	var args []interface{}
 
 	if req.MinPrice > 0 {
@@ -298,7 +299,7 @@ func (s *bookCatalogServer) FilterBooks(ctx context.Context, req *pb.FilterBooks
 	books := []*pb.Book{}
 	for rows.Next() {
 		var b pb.Book
-		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Isbn, &b.Price, &b.Stock, &b.PublishedYear); err != nil {
+		if err := rows.Scan(&b.Id, &b.Title, &b.Author, &b.Isbn, &b.Price, &b.Stock, &b.PublishedYear, &b.AuthorId); err != nil {
 			return nil, status.Errorf(codes.Internal, "scan failed: %v", err)
 		}
 		books = append(books, &b)
@@ -376,7 +377,8 @@ func initDB() (*sql.DB, error) {
 			isbn TEXT,
 			price REAL,
 			stock INTEGER,
-			published_year INTEGER
+			published_year INTEGER,
+			author_id INTEGER DEFAULT 0
 		);
 	`)
 	if err != nil {
