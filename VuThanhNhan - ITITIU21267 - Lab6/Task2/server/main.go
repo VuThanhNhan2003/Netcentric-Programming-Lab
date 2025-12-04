@@ -14,7 +14,7 @@ import (
 )
 
 type calculatorServer struct {
-	pb.UnimplementedCalculatorServer
+	pb.UnimplementedCalculatorServer // Embed and ensure code update safety
 	history []string
 }
 

@@ -20,7 +20,7 @@ func main() {
 		Stock:        15,
 		PublishedYear: 2015,
 	}
-	
+	// %v is used to printf the struct with field names
 	fmt.Printf("Book: %v\n", book)
 	
 	// Create DetailedBook with category and tags
