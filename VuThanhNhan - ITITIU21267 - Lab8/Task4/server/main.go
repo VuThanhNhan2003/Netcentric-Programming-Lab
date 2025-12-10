@@ -109,7 +109,6 @@ func (h *Hub) run() {
 // addClientToRoom adds a client to specified room
 func (h *Hub) addClientToRoom(client *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	// Get existing room or create new one
 	room, exists := h.rooms[client.Room]
@@ -125,10 +124,13 @@ func (h *Hub) addClientToRoom(client *Client) {
 	// Add client to room
 	room.mu.Lock()
 	room.Clients[client] = true
+	clientCount := len(room.Clients)
 	room.mu.Unlock()
 
+	h.mu.Unlock() // ⭐ UNLOCK TRƯỚC KHI BROADCAST!
+
 	log.Printf("Client %s joined room %s (Total: %d)",
-		client.Username, client.Room, len(room.Clients))
+		client.Username, client.Room, clientCount)
 
 	// Send join notification to all clients in room
 	msg := Message{
@@ -148,7 +150,7 @@ func (h *Hub) addClientToRoom(client *Client) {
 func (h *Hub) removeClientFromRoom(client *Client) {
 	h.mu.RLock()
 	room, exists := h.rooms[client.Room]
-	h.mu.RUnlock()
+	h.mu.RUnlock() // ⭐ UNLOCK NGAY
 
 	if !exists {
 		return
@@ -160,10 +162,11 @@ func (h *Hub) removeClientFromRoom(client *Client) {
 		delete(room.Clients, client)
 		close(client.Send)
 	}
+	clientCount := len(room.Clients)
 	room.mu.Unlock()
 
 	log.Printf("Client %s left room %s (Remaining: %d)",
-		client.Username, client.Room, len(room.Clients))
+		client.Username, client.Room, clientCount)
 
 	// Send leave notification to remaining clients in room
 	msg := Message{
@@ -179,7 +182,7 @@ func (h *Hub) removeClientFromRoom(client *Client) {
 	h.sendUserCountUpdate(client.Room)
 
 	// Delete room if empty
-	if len(room.Clients) == 0 {
+	if clientCount == 0 {
 		h.mu.Lock()
 		delete(h.rooms, client.Room)
 		h.mu.Unlock()
@@ -477,10 +480,15 @@ func handleWebSocket(c *gin.Context) {
 		Send:     make(chan []byte, 256),
 	}
 
-	hub.register <- client
-
+	// Start goroutines BEFORE registering to hub
 	go client.writePump()
 	go client.readPump(hub)
+	
+	// Small delay to ensure goroutines are ready
+	time.Sleep(10 * time.Millisecond)
+	
+	// Register client to hub (this will send join notification)
+	hub.register <- client
 }
 
 func main() {

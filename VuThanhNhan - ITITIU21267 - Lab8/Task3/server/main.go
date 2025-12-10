@@ -78,7 +78,6 @@ func (h *Hub) run() {
 // addClientToRoom adds a client to specified room (creates room if needed)
 func (h *Hub) addClientToRoom(client *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	// Get existing room or create new one
 	room, exists := h.rooms[client.Room]
@@ -95,6 +94,8 @@ func (h *Hub) addClientToRoom(client *Client) {
 	room.mu.Lock()
 	room.Clients[client] = true
 	room.mu.Unlock()
+
+	h.mu.Unlock() // ⭐ UNLOCK TRƯỚC KHI BROADCAST!
 
 	log.Printf("Client %s joined room %s (Total: %d)",
 		client.Username, client.Room, len(room.Clients))
@@ -114,7 +115,7 @@ func (h *Hub) addClientToRoom(client *Client) {
 func (h *Hub) removeClientFromRoom(client *Client) {
 	h.mu.RLock()
 	room, exists := h.rooms[client.Room]
-	h.mu.RUnlock()
+	h.mu.RUnlock() // ⭐ UNLOCK NGAY SAU KHI LẤY ROOM
 
 	if !exists {
 		return
@@ -126,10 +127,11 @@ func (h *Hub) removeClientFromRoom(client *Client) {
 		delete(room.Clients, client)
 		close(client.Send)
 	}
+	clientCount := len(room.Clients)
 	room.mu.Unlock()
 
 	log.Printf("Client %s left room %s (Remaining: %d)",
-		client.Username, client.Room, len(room.Clients))
+		client.Username, client.Room, clientCount)
 
 	// Send leave notification to remaining clients in room
 	msg := Message{
@@ -142,7 +144,7 @@ func (h *Hub) removeClientFromRoom(client *Client) {
 	h.broadcastToRoom(client.Room, msg)
 
 	// Delete room if empty
-	if len(room.Clients) == 0 {
+	if clientCount == 0 {
 		h.mu.Lock()
 		delete(h.rooms, client.Room)
 		h.mu.Unlock()
@@ -301,6 +303,9 @@ func handleWebSocket(c *gin.Context) {
 	// Start goroutines for reading and writing
 	go client.writePump()
 	go client.readPump(hub)
+
+	// Register client to hub (this will send join notification + history)
+	hub.register <- client
 }
 
 func main() {
