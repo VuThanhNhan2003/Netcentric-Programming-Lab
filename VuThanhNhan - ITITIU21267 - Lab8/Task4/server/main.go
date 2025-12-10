@@ -498,8 +498,6 @@ func main() {
 	router.GET("/ws", handleWebSocket)
 
 	fmt.Println("🚀 Chat Server with Statistics on :8080")
-	fmt.Println("📱 Commands: /users, /stats, /rooms")
-	fmt.Println("Example: go run client/stats_client.go Alice general")
 
 	router.Run(":8080")
 }

@@ -524,10 +524,6 @@ func main() {
 
 	fmt.Println("🚀 Notification Server on :8080")
 	fmt.Println("📱 WebSocket: ws://localhost:8080/ws")
-	fmt.Println("🔧 Admin API: POST http://localhost:8080/api/notify")
-	fmt.Println("📊 Stats API: GET http://localhost:8080/api/stats")
-	fmt.Println("Example: go run client/notification_client.go Alice general")
-	fmt.Println("Admin: go run client/admin.go broadcast \"Hello everyone!\"")
 
 	// Start server
 	router.Run(":8080")

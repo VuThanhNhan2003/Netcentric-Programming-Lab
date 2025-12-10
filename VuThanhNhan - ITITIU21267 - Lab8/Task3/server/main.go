@@ -319,8 +319,6 @@ func main() {
 	router.GET("/ws", handleWebSocket)
 
 	fmt.Println("🚀 Chat Rooms Server started on :8080")
-	fmt.Println("📱 Connect using: go run client/room_client.go <username> <room>")
-	fmt.Println("Example: go run client/room_client.go Alice general")
 
 	// Start server
 	router.Run(":8080")

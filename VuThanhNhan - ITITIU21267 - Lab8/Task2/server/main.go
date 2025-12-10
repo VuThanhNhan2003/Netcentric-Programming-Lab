@@ -192,7 +192,6 @@ func main() {
 	router.GET("/ws", handleWebSocket)
 
 	fmt.Println("🚀 Broadcast Chat Server started on :8080")
-	fmt.Println("📱 Connect using: go run client/broadcast.go")
 	
 	// Start server
 	router.Run(":8080")
