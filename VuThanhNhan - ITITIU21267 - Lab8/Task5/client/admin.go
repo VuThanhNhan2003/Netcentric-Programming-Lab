@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
 )
 
-// Notification structure matching server
+// Notification structure
 type Notification struct {
 	ID        string    `json:"id"`
 	Type      string    `json:"type"`
@@ -20,111 +21,83 @@ type Notification struct {
 	Target    string    `json:"target"`
 }
 
-const serverURL = "http://localhost:8080"
+const serverURL = "http://localhost:8080/api/notify"
 
 func main() {
 	if len(os.Args) < 2 {
-		printUsage()
+		fmt.Println("Usage: go run admin.go <command> [args]")
+		fmt.Println("Commands:")
+		fmt.Println("  broadcast \"message\"")
+		fmt.Println("  room <roomname> \"message\"")
+		fmt.Println("  user <username> \"message\"")
+		fmt.Println("  announce \"title\" \"message\"")
 		os.Exit(1)
 	}
 
 	command := os.Args[1]
+	var notif Notification
 
 	switch command {
 	case "broadcast":
 		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run admin.go broadcast \"message\"")
-			os.Exit(1)
+			log.Fatal("Usage: broadcast \"message\"")
 		}
-		sendNotification(Notification{
+		notif = Notification{
 			Type:    "info",
 			Title:   "Broadcast",
 			Message: os.Args[2],
 			Target:  "all",
-		})
+		}
 
 	case "room":
 		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run admin.go room <room_name> \"message\"")
-			os.Exit(1)
+			log.Fatal("Usage: room <roomname> \"message\"")
 		}
-		sendNotification(Notification{
+		notif = Notification{
 			Type:    "info",
-			Title:   "Room Notification",
+			Title:   "Room: " + os.Args[2],
 			Message: os.Args[3],
-			Target:  fmt.Sprintf("room:%s", os.Args[2]),
-		})
+			Target:  "room:" + os.Args[2],
+		}
 
 	case "user":
 		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run admin.go user <username> \"message\"")
-			os.Exit(1)
+			log.Fatal("Usage: user <username> \"message\"")
 		}
-		sendNotification(Notification{
+		notif = Notification{
 			Type:    "info",
 			Title:   "Private Message",
 			Message: os.Args[3],
-			Target:  fmt.Sprintf("user:%s", os.Args[2]),
-		})
+			Target:  "user:" + os.Args[2],
+		}
 
 	case "announce":
 		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run admin.go announce \"title\" \"message\"")
-			os.Exit(1)
+			log.Fatal("Usage: announce \"title\" \"message\"")
 		}
-		sendNotification(Notification{
-			Type:    "success",
+		notif = Notification{
+			Type:    "warning",
 			Title:   os.Args[2],
 			Message: os.Args[3],
 			Target:  "all",
-		})
+		}
 
 	default:
-		fmt.Printf("Unknown command: %s\n", command)
-		printUsage()
-		os.Exit(1)
-	}
-}
-
-func printUsage() {
-	fmt.Println("Usage: go run admin.go <command> [arguments]")
-	fmt.Println("\nCommands:")
-	fmt.Println("  broadcast \"message\"")
-	fmt.Println("  room <room_name> \"message\"")
-	fmt.Println("  user <username> \"message\"")
-	fmt.Println("  announce \"title\" \"message\"")
-}
-
-func sendNotification(notif Notification) {
-	jsonData, err := json.Marshal(notif)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		log.Fatalf("Unknown command: %s", command)
 	}
 
-	resp, err := http.Post(
-		serverURL+"/api/notify",
-		"application/json",
-		bytes.NewBuffer(jsonData),
-	)
+	// Send notification
+	data, _ := json.Marshal(notif)
+	resp, err := http.Post(serverURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		log.Fatalf("Failed to send: %v", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		fmt.Printf("Error: %s\n", string(body))
-		return
+		log.Fatalf("Server error: %s", string(body))
 	}
 
-	var result map[string]interface{}
-	json.Unmarshal(body, &result)
-	fmt.Printf("Notification sent: %s\n", result["id"])
+	fmt.Println("Notification sent successfully")
 }
